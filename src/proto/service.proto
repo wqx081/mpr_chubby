@@ -1,0 +1,263 @@
+syntax = "proto3";
+
+package mpr.chubby;
+
+// 节点角色
+enum NodeStatus {
+    kLeader = 0;    //
+    kCandiate = 1;
+    kFollower = 2;
+    kOffline = 3;
+}
+
+enum LogOperation {
+    kLogOperationUnknown = 0;
+    kPut = 1;
+    kDel = 2;
+    kLock = 3;
+    kUnLock = 4;
+    kLogin = 5;
+    kLogout = 6;
+    kRegister = 7;
+    kNop = 10;
+}
+
+enum StatOperation {
+    kStatOperationUnknown = 0;
+    kPutOp = 1;
+    kGetOp = 2;
+    kDeleteOp = 3;
+    kScanOp = 4;
+    kKeepAliveOp = 5;
+    kLockOp = 6;
+    kUnlockOp = 7;
+    // kWatchOp = 8;
+}
+
+// Messages
+message UserInfo {
+    string username = 1;
+    string password = 2;
+}
+
+message Entry {
+    string key = 1;
+    bytes value = 2;
+    int64 term = 3;
+    LogOperation op = 4;
+    string user = 5;
+}
+
+message StatInfo {
+    int64 current_stat = 1;
+    int64 average_stat = 2;
+}
+
+// Request & Response
+message AppendEntriesRequest {
+    int64 term = 1;
+    string leader_id = 2;
+    int64 prev_log_index = 3;
+    int64 prev_log_term = 4;
+    int64 leader_commit_index = 5;
+    repeated Entry entries = 6;
+}
+
+message AppendEntriesResponse {
+    int64 current_term = 1;
+    bool success = 2;
+    int64 log_length = 3;
+    bool is_busy = 4; //  [default = false];
+}
+
+message VoteRequest {
+    int64 term = 1;
+    string candidate_id = 2;
+    int64 last_log_index = 3;
+    int64 last_log_term = 4;
+}
+
+message VoteResponse {
+    int64 term = 1;
+    bool vote_granted = 2;
+}
+
+message PutRequest {
+    string key = 1;
+    bytes value = 2;
+    string uuid = 3;
+}
+
+message PutResponse {
+    bool success = 1;
+    string leader_id = 2;
+    bool uuid_expired = 3;
+}
+
+message GetRequest {
+    string key = 1;
+    string uuid = 2;
+}
+
+message GetResponse {
+    bool hit = 1;
+    bytes value = 2;
+    string leader_id = 3;
+    bool success = 4;
+    bool uuid_expired = 5;
+}
+
+message DelRequest {
+    string key = 1;
+    string uuid = 2;
+}
+
+message DelResponse {
+    bool success = 1;
+    string leader_id = 2;
+    bool uuid_expired = 3;
+}
+
+
+message UnLockRequest {
+    string key = 1;
+    string session_id = 2;
+    string uuid = 3;
+}
+
+message UnLockResponse {
+    bool success = 1;
+    string leader_id = 2;
+    bool uuid_expired = 3;
+}
+
+message ShowStatusRequest {
+
+}
+
+message ShowStatusResponse {
+    NodeStatus status = 1;
+    int64 term = 2;
+    int64 last_log_index = 3;
+    int64 last_log_term = 4;
+    int64 commit_index = 5;
+    int64 last_applied = 6;
+}
+
+message ScanRequest {
+    string start_key = 1;
+    bytes end_key = 2;
+    int32 size_limit = 3;
+    string uuid = 4;
+}
+
+message ScanItem {
+    string key = 1;
+    bytes value = 2;
+}
+
+message ScanResponse {
+    bool has_more = 1;
+    repeated ScanItem items = 2;
+    string leader_id = 3;
+    bool success = 4;
+    bool uuid_expired = 5;
+}
+
+message LockRequest {
+    string key = 1;
+    string session_id = 2;
+    string hostname = 3;
+    string uuid = 4;
+}
+
+message LockResponse {
+    bool success = 1;
+    string leader_id = 2;
+    bool uuid_expired = 3;
+}
+
+message KeepAliveRequest {
+    string session_id = 1;
+    string uuid = 2;
+    repeated string locks = 3;
+    bool forward_from_leader = 4; // [default = false];
+}
+
+message KeepAliveResponse {
+    bool success = 1;
+    string leader_id = 2;
+}
+
+//TODO(wqx): Watch Event
+
+message LoginRequest {
+    string username = 1;
+    string passwd = 2;
+}
+
+message Status {
+    int64 code = 1;
+    string message = 2;
+}
+
+message LoginResponse {
+    Status status = 1;
+    string uuid = 2;
+    string leader_id = 3;
+}
+
+message LogoutRequest {
+    string uuid = 1;
+}
+
+message LogoutResponse {
+    Status status = 1;
+    string leader_id = 2;
+}
+
+message RegisterRequest {
+    string username = 1;
+    string passwd = 2;
+}
+
+message RegisterResponse {
+    Status status = 1;
+    string leader_id = 2;
+}
+
+message CleanBinlogRequest {
+    int64 end_index = 1;
+}
+
+message CleanBinlogResponse {
+    bool success = 1;
+}
+
+message RpcStatRequest {
+    repeated StatOperation op = 1;
+}
+
+message RpcStatResponse {
+    NodeStatus status = 1;
+    repeated StatInfo stats = 2;
+}
+
+service ChubbyNode {
+    rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
+    rpc Vote(VoteRequest) returns (VoteResponse);
+    rpc Put(PutRequest) returns (PutResponse);
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Delete(DelRequest) returns (DelResponse);
+    rpc Scan(ScanRequest) returns (ScanResponse);
+    rpc Lock(LockRequest) returns (LockResponse);
+    rpc UnLock(UnLockRequest) returns (UnLockResponse);
+//    rpc Watch(WatchRequest) returns (WatchResponse);
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc Logout(LogoutRequest) returns (LogoutResponse);
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse);
+    rpc ShowStatus(ShowStatusRequest) returns (ShowStatusResponse);
+    rpc CleanBinlog(CleanBinlogRequest) returns (CleanBinlogResponse);
+    rpc RpcStat(RpcStatRequest) returns (RpcStatResponse);
+}

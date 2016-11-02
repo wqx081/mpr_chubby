@@ -1,0 +1,5 @@
+
+0) 创建一个新的 evhtp_t 实例
+
+	evhtp_t* evhtp_new(evbase_t* evbase, void* arg);
+	void     evhtp_free(evhtp_t* evhtp);
