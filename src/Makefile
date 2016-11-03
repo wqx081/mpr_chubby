@@ -83,6 +83,8 @@ CPP_SOURCES := \
 	\
 	./proto/service.pb.cc \
 	./storage/bin_logger.cc \
+	./storage/database.cc \
+	./server/flags.cc \
 
 CPP_OBJECTS := $(CPP_SOURCES:.cc=.o)
 
@@ -91,6 +93,10 @@ TESTS := \
 	./base/http/libevhtp_basic_unittest \
 	./base/http/libevhtp_http_server_unittest \
 	./base/libevent/http_client_unittest \
+	\
+	\
+	./storage/database_unittest \
+	./storage/bin_logger_unittest \
 
 #APP := mpr_rest_server
 APP := #mpr_rest_server
@@ -439,6 +445,23 @@ $(APP): ./server/http_server.o
 	@echo "  [CXX]  $@"
 	@$(CXX) $(CXXFLAGS) $@ $<
 
+
+
+./storage/database_unittest: ./storage/database_unittest.o
+	@echo "  [LINK] $@"
+	@$(CXX) -o $@ $< $(CPP_OBJECTS) $(LIB_FILES) $(TEST_LIB_FILES)
+./storage/database_unittest.o: ./storage/database_unittest.cc \
+	./storage/database.o
+	@echo "  [CXX]  $@"
+	@$(CXX) $(CXXFLAGS) $@ $<
+
+./storage/bin_logger_unittest: ./storage/bin_logger_unittest.o
+	@echo "  [LINK] $@"
+	@$(CXX) -o $@ $< $(CPP_OBJECTS) $(LIB_FILES) $(TEST_LIB_FILES)
+./storage/bin_logger_unittest.o: ./storage/bin_logger_unittest.cc \
+	./storage/bin_logger.o
+	@echo "  [CXX]  $@"
+	@$(CXX) $(CXXFLAGS) $@ $<
 
 ## /////////////////////////////
 

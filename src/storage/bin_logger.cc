@@ -21,9 +21,7 @@ BinLogger::BinLogger(const Options& options)
     : length_(0), last_log_term_(-1) {
 
   base::Status status = base::Env::Default()->CreateDirectory(kLogDbName);
-  if (!status.ok()) {
-
-  }
+  DCHECK(status.ok() || status.code() == base::error::ALREADY_EXISTS) << status.ToString(); 
 
   std::string full_path = base::io::JoinPath(options.db_path, kLogDbName);
   leveldb::Options db_options;
@@ -45,7 +43,9 @@ BinLogger::BinLogger(const Options& options)
   std::string value;
   db_status = db_->Get(leveldb::ReadOptions(), kLengthTag, &value);
   if (db_status.ok() && !value.empty()) {
-    DCHECK(base::strings::safe_strto64(value, (base::int64 *)&length_));
+    //DCHECK(base::strings::safe_strto64(value, (base::int64 *)&length_)) << "value: " << value;
+    length_ = KeyToIndex(value);
+    LOG(INFO) << "Length: " << length_;
     if (length_ > 0) {
       LogEntry log_entry;
       DCHECK(ReadSlot(length_ - 1, &log_entry));
@@ -96,33 +96,33 @@ bool BinLogger::RemoveSlotBefore(int64_t slot_gc_index) {
   (void) slot_gc_index;
   // TODO(wqx):
   // db_->SetNexusGCKey(slot_gc_index);
+  // DBImpl::CompactRange
+  db_->CompactRange(nullptr, nullptr);
   return true;
 }
 
 void BinLogger::AppendEntryList(const google::protobuf::RepeatedPtrField<mpr::chubby::Entry>& entries) {
+  base::mutex_lock l(mu_);
   leveldb::WriteBatch batch;
-  {
-    base::mutex_lock l(mu_);
-    int64_t current_index = length_;
-    std::string next_index = IndexToKey(length_ + entries.size());
-    for (int i = 0; i < entries.size(); i++) {
-      LogEntry log_entry;
-      std::string buf;
-      log_entry.log_operation = entries.Get(i).op();
-      log_entry.user = entries.Get(i).user();
-      log_entry.key = entries.Get(i).key();
-      log_entry.value = entries.Get(i).value();
-      log_entry.term = entries.Get(i).term();
-      last_log_term_ =  log_entry.term;
-      LogEntryToString(log_entry, &buf);
+  int64_t current_index = length_;
+  std::string next_index = IndexToKey(length_ + entries.size());
+  for (int i = 0; i < entries.size(); i++) {
+    LogEntry log_entry;
+    std::string buf;
+    log_entry.log_operation = entries.Get(i).op();
+    log_entry.user = entries.Get(i).user();
+    log_entry.key = entries.Get(i).key();
+    log_entry.value = entries.Get(i).value();
+    log_entry.term = entries.Get(i).term();
+    last_log_term_ =  log_entry.term;
+    LogEntryToString(log_entry, &buf);
 
-      batch.Put(IndexToKey(current_index + i), buf);
-    }
-    batch.Put(kLengthTag, next_index);
-    leveldb::Status status = db_->Write(leveldb::WriteOptions(), &batch);
-    DCHECK(status.ok());
-    length_ += entries.size();
-  } 
+    batch.Put(IndexToKey(current_index + i), buf);
+  }
+  batch.Put(kLengthTag, next_index);
+  leveldb::Status status = db_->Write(leveldb::WriteOptions(), &batch);
+  DCHECK(status.ok());
+  length_ += entries.size();
 }
 
 void BinLogger::AppendEntry(const LogEntry& log_entry) {
@@ -132,38 +132,34 @@ void BinLogger::AppendEntry(const LogEntry& log_entry) {
   std::string current_index;
   std::string next_index;
 
-  {
-    base::mutex_lock l(mu_);
+  base::mutex_lock l(mu_);
 
-    current_index = IndexToKey(length_);
-    next_index = IndexToKey(length_ + 1);
-    leveldb::WriteBatch batch;
-    batch.Put(current_index, buf);
-    batch.Put(kLengthTag, next_index);
-    leveldb::Status status = db_->Write(leveldb::WriteOptions(), &batch);
+  current_index = IndexToKey(length_);
+  next_index = IndexToKey(length_ + 1);
+  leveldb::WriteBatch batch;
+  batch.Put(current_index, buf);
+  batch.Put(kLengthTag, next_index);
+  leveldb::Status status = db_->Write(leveldb::WriteOptions(), &batch);
 
-    DCHECK(status.ok());
+  DCHECK(status.ok());
 
-    length_++;
-    last_log_term_ = log_entry.term;
-  }
+  length_++;
+  last_log_term_ = log_entry.term;
 }
 
 void BinLogger::Truncate(int64_t trunk_slot_index) {
   if (trunk_slot_index < -1)
     trunk_slot_index = -1;
   
-  {
-    base::mutex_lock l(mu_);
-    length_ = trunk_slot_index + 1;
-    leveldb::Status status = db_->Put(leveldb::WriteOptions(),
-                                      kLengthTag, IndexToKey(length_));
-    assert(status.ok());
-    if (length_ > 0) {
-      LogEntry log_entry;
-      DCHECK(ReadSlot(length_ - 1, &log_entry));
-      last_log_term_ = log_entry.term;
-    }
+  base::mutex_lock l(mu_);
+  length_ = trunk_slot_index + 1;
+  leveldb::Status status = db_->Put(leveldb::WriteOptions(),
+                                    kLengthTag, IndexToKey(length_));
+  DCHECK(status.ok());
+  if (length_ > 0) {
+    LogEntry log_entry;
+    DCHECK(ReadSlot(length_ - 1, &log_entry));
+    last_log_term_ = log_entry.term;
   }
 }
 
