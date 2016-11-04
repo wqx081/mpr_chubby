@@ -84,12 +84,16 @@ CPP_SOURCES := \
 	./proto/service.pb.cc \
 	./storage/bin_logger.cc \
 	./storage/database.cc \
+	./storage/meta_file.cc \
 	./server/flags.cc \
+	
+
 
 CPP_OBJECTS := $(CPP_SOURCES:.cc=.o)
 
 
 TESTS := \
+	./base/io/inputbuffer_unittest \
 	./base/http/libevhtp_basic_unittest \
 	./base/http/libevhtp_http_server_unittest \
 	./base/libevent/http_client_unittest \
@@ -97,6 +101,7 @@ TESTS := \
 	\
 	./storage/database_unittest \
 	./storage/bin_logger_unittest \
+	./storage/meta_unittest \
 
 #APP := mpr_rest_server
 APP := #mpr_rest_server
@@ -462,6 +467,14 @@ $(APP): ./server/http_server.o
 	./storage/bin_logger.o
 	@echo "  [CXX]  $@"
 	@$(CXX) $(CXXFLAGS) $@ $<
+
+./storage/meta_unittest: ./storage/meta_unittest.o
+	@echo "  [LINK] $@"
+	@$(CXX) -o $@ $< $(CPP_OBJECTS) $(LIB_FILES) $(TEST_LIB_FILES)
+./storage/meta_unittest.o: ./storage/meta_unittest.cc
+	@echo "  [CXX]  $@"
+	@$(CXX) $(CXXFLAGS) $@ $<
+
 
 ## /////////////////////////////
 

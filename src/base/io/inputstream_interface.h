@@ -9,31 +9,28 @@
 namespace base {
 namespace io {
 
-// An interface that defines input streaming operations.
+// \brief 输入流操作接口
+//
 class InputStreamInterface {
  public:
   InputStreamInterface() {}
   virtual ~InputStreamInterface() {}
 
-  // Reads the next bytes_to_read from the file. Typical return codes:
-  //  * OK - in case of success.
-  //  * OUT_OF_RANGE - not enough bytes remaining before end of file.
+  // \brief 从文件中读取 bytes_to_read
+  // \param bytes_to_read 要读取的字节数目
+  // \param result 读取的结果保存到 result
+  // \return OK 表示成功, OUT_OF_RANGE 表示要读取流的大小不足 bytes_to_read
   virtual Status ReadNBytes(int64 bytes_to_read, string* result) = 0;
 
-  // Skips bytes_to_skip before next ReadNBytes. bytes_to_skip should be >= 0.
-  // Typical return codes:
-  //  * OK - in case of success.
-  //  * OUT_OF_RANGE - not enough bytes remaining before end of file.
+  // \brief 跳过bytes_to_skip 字节
+  // \param bytes_to_skip 必须 >= 0
+  // \return OK 表示成功, OUT_OF_RANGE 表示要读取流的大小不足 bytes_to_skip
   virtual Status SkipNBytes(int64 bytes_to_skip);
 
-  // Return the offset of the current byte relative to the beginning of the
-  // file.
-  // If we Skip / Read beyond the end of the file, this should return the length
-  // of the file.
-  // If there are any errors, this must return -1.
+  // \brief 返回当前相对于文件起始位置的字节偏移, 如果返回-1, 表示出错
   virtual int64 Tell() const = 0;
 
-  // Resets the stream to the beginning.
+  // \brief 重置流回到起始位置
   virtual Status Reset() = 0;
 };
 
